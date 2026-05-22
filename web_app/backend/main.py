@@ -18,6 +18,30 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+CITY_COORDINATE_OVERRIDES: Dict[str, Tuple[float, float]] = {
+    "al hoceima": (35.2472, -3.9322),
+    "beni mellal": (32.3394, -6.3608),
+    "boujdour": (26.1333, -14.5000),
+    "chefchaouen": (35.1714, -5.2697),
+    "dakhla": (23.7081, -15.9456),
+    "el jadida": (33.2547, -8.5060),
+    "fes": (34.0433, -5.0033),
+    "khenifra": (32.9394, -5.6675),
+    "khouribga": (32.8811, -6.9063),
+    "laayoune": (27.1500, -13.1989),
+    "meknes": (33.8950, -5.5547),
+    "midelt": (32.6853, -4.7451),
+    "ouarzazate": (30.9192, -6.8938),
+    "oujda": (34.6867, -1.9114),
+    "salé": (34.0333, -6.8000),
+    "tanger": (35.7767, -5.8039),
+    "taroudant": (30.4710, -8.8806),
+    "tetouan": (35.5667, -5.3667),
+    "tinghir": (31.5147, -5.5328),
+}
+
+
 # ============================================
 # Pydantic Models for Response
 # ============================================
@@ -125,6 +149,8 @@ class ModelManager:
         self.data_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
         self.min_year = None
         self.max_year = None
+        self.min_date = None
+        self.max_date = None
         self.load_models()
         self.load_data()
 
@@ -166,8 +192,10 @@ class ModelManager:
             self.features_df['time'] = pd.to_datetime(self.features_df['time'])
             
             # Get year range from data
-            self.min_year = int(self.features_df['time'].dt.year.min())
-            self.max_year = int(self.features_df['time'].dt.year.max())
+            self.min_date = self.features_df['time'].min()
+            self.max_date = self.features_df['time'].max()
+            self.min_year = int(self.min_date.year)
+            self.max_year = int(self.max_date.year)
             
             logger.info(f"✓ Features data loaded ({len(self.features_df)} records)")
             logger.info(f"  Data spans from {self.min_year} to {self.max_year}")
@@ -189,6 +217,10 @@ class ModelManager:
         """Get latitude and longitude for a city"""
         if self.cities_df is None:
             return None
+        city_key = city.lower()
+        if city_key in CITY_COORDINATE_OVERRIDES:
+            return CITY_COORDINATE_OVERRIDES[city_key]
+
         city_data = self.cities_df[self.cities_df['city'].str.lower() == city.lower()]
         if len(city_data) > 0:
             return (city_data.iloc[0]['lat'], city_data.iloc[0]['lng'])
@@ -353,13 +385,18 @@ async def health_check():
     """Health check endpoint"""
     if model_manager is None or model_manager.drought_model is None:
         raise HTTPException(status_code=503, detail="Models not loaded")
+
     return {
         "status": "healthy",
         "model_loaded": model_manager.drought_model is not None,
         "available_cities": model_manager.get_available_cities(),
         "data_range": {
             "min_year": model_manager.min_year,
-            "max_year": model_manager.max_year
+            "max_year": model_manager.max_year,
+            "min_month": int(model_manager.min_date.month),
+            "max_month": int(model_manager.max_date.month),
+            "min_date": model_manager.min_date.strftime("%Y-%m-%d"),
+            "max_date": model_manager.max_date.strftime("%Y-%m-%d"),
         }
     }
 
@@ -494,11 +531,15 @@ async def get_map_data(
         if model_manager is None:
             raise HTTPException(status_code=503, detail="Models not available")
 
-        # Validate year range (only reject years before data start)
-        if year < model_manager.min_year:
+        requested_date = pd.Timestamp(year=year, month=month, day=1)
+        if requested_date < model_manager.min_date or requested_date > model_manager.max_date:
             raise HTTPException(
                 status_code=400,
-                detail=f"Data not available for year {year}. Earliest available year: {model_manager.min_year}"
+                detail=(
+                    f"Observed map data is available from "
+                    f"{model_manager.min_date.strftime('%Y-%m')} to "
+                    f"{model_manager.max_date.strftime('%Y-%m')}"
+                )
             )
 
         available_cities = model_manager.get_available_cities()
@@ -506,8 +547,9 @@ async def get_map_data(
 
         for city in available_cities:
             try:
-                # Get prediction for each city (with fallback for future dates)
-                city_data = model_manager.get_city_data_or_estimate(city, year, month)
+                # Use exact historical observations only. The map should not
+                # display reused fallback months as if they were real data.
+                city_data = model_manager.get_city_data(city, year, month)
                 if city_data is None or len(city_data) == 0:
                     continue
 

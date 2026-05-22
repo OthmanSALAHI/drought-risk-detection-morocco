@@ -3,6 +3,7 @@ import {
   PredictionResponse,
   MapResponse,
   HistoryResponse,
+  HealthResponse,
 } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -118,6 +119,11 @@ export const getMapData = async (
     return mockMap(month, year);
   }
   const res = await api.get('/map', { params: { month, year } });
+  return res.data;
+};
+
+export const getHealth = async (): Promise<HealthResponse> => {
+  const res = await api.get('/health');
   return res.data;
 };
 

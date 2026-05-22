@@ -39,6 +39,20 @@ export interface MapResponse {
   cities: MapCityData[];
 }
 
+export interface HealthResponse {
+  status: string;
+  model_loaded: boolean;
+  available_cities: string[];
+  data_range: {
+    min_year: number;
+    max_year: number;
+    min_month: number;
+    max_month: number;
+    min_date: string;
+    max_date: string;
+  };
+}
+
 export interface HistoryDataPoint {
   date: string;
   spi: number;
