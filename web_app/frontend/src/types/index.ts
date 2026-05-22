@@ -4,6 +4,7 @@ export interface ClimateData {
   et0: number;
   water_balance: number;
   spi: number;
+  spi_category: string;
 }
 
 export interface MonthData {
@@ -28,6 +29,8 @@ export interface MapCityData {
   lng: number;
   prediction: 'Drought' | 'No Drought';
   drought_probability: number;
+  spi: number;
+  spi_category: string;
 }
 
 export interface MapResponse {
@@ -39,6 +42,7 @@ export interface MapResponse {
 export interface HistoryDataPoint {
   date: string;
   spi: number;
+  spi_category: string;
   precipitation: number;
   label: 'Drought' | 'No Drought';
 }

@@ -9,6 +9,7 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { getMapData } from '../services/api';
 import { MapResponse } from '../types';
+import { formatDecimal } from '../utils/format';
 
 export const MapView: React.FC = () => {
   const navigate = useNavigate();
@@ -129,7 +130,15 @@ export const MapView: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400">Probability:</span>
-                            <span className="font-semibold text-white">{city.drought_probability}%</span>
+                            <span className="font-semibold text-white">{formatDecimal(city.drought_probability)}%</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">SPI:</span>
+                            <span className="font-semibold text-white">{formatDecimal(city.spi)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Category:</span>
+                            <span className="font-semibold text-white">{city.spi_category}</span>
                           </div>
                           <button
                             onClick={() => navigate(`/predict?city=${encodeURIComponent(city.city)}`)}

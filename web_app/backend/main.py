@@ -1,6 +1,7 @@
 import pickle
 import os
 import sys
+import math
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import logging
@@ -27,6 +28,7 @@ class ClimateData(BaseModel):
     et0: float
     water_balance: float
     spi: float
+    spi_category: str
 
 
 class MonthData(BaseModel):
@@ -51,6 +53,8 @@ class MapCityData(BaseModel):
     lng: float
     prediction: str = Field(..., pattern="^(Drought|No Drought)$")
     drought_probability: float
+    spi: float
+    spi_category: str
 
 
 class MapResponse(BaseModel):
@@ -62,6 +66,7 @@ class MapResponse(BaseModel):
 class HistoryDataPoint(BaseModel):
     date: str
     spi: float
+    spi_category: str
     precipitation: float
     label: str = Field(..., pattern="^(Drought|No Drought)$")
 
@@ -285,10 +290,49 @@ class ModelManager:
 
 FEATURE_COLUMNS = [
     'city_encoded', 'precipitation_sum', 'temperature_2m_mean', 'et0_fao_evapotranspiration',
-    'water_balance', 'precip_lag1', 'precip_lag2', 'precip_lag3', 'temp_lag1', 'temp_lag2',
+    'water_balance', 'SPI', 'precip_lag1', 'precip_lag2', 'precip_lag3', 'temp_lag1', 'temp_lag2',
     'temp_lag3', 'precip_rolling3', 'precip_rolling6', 'temp_rolling3', 'et0_rolling3',
     'month', 'season_encoded'
 ]
+
+
+def classify_spi(spi: float) -> str:
+    """Translate SPI values to standard drought/wetness categories."""
+    if spi <= -2.0:
+        return "Extremely Dry"
+    if spi <= -1.5:
+        return "Severely Dry"
+    if spi <= -1.0:
+        return "Moderately Dry"
+    if spi < 1.0:
+        return "Near Normal"
+    if spi < 1.5:
+        return "Moderately Wet"
+    if spi < 2.0:
+        return "Very Wet"
+    return "Extremely Wet"
+
+
+def predict_drought_probability(model, X: np.ndarray) -> Tuple[str, float, float]:
+    """Return binary drought label and probabilities with class-order safety."""
+    prediction_proba = model.predict_proba(X)[0]
+    classes = list(model.classes_)
+    drought_idx = classes.index(1) if 1 in classes else len(classes) - 1
+    no_drought_idx = classes.index(0) if 0 in classes else 0
+
+    drought_prob = float(prediction_proba[drought_idx]) * 100
+    no_drought_prob = float(prediction_proba[no_drought_idx]) * 100
+    prediction_label = "Drought" if drought_prob >= 50 else "No Drought"
+
+    return prediction_label, drought_prob, no_drought_prob
+
+
+def drought_risk_from_spi(spi: float) -> Tuple[str, float, float]:
+    """Score drought risk from the accepted SPI drought threshold."""
+    drought_prob = 100 / (1 + math.exp(2.8 * (spi + 1.0)))
+    no_drought_prob = 100 - drought_prob
+    prediction_label = "Drought" if spi <= -1.0 else "No Drought"
+    return prediction_label, drought_prob, no_drought_prob
 
 
 # Initialize model manager
@@ -383,26 +427,19 @@ async def predict(
             )
 
         # Prepare features
-        X = city_data[features_cols].fillna(0).values
+        X = city_data[features_cols].fillna(0)
         if len(X) > 1:
-            X = X[0:1]  # Take first record if multiple
+            X = X.iloc[0:1]  # Take first record if multiple
 
-        # Make prediction
+        spi = float(city_data.iloc[0]['SPI'])
         try:
-            prediction_proba = model_manager.drought_model.predict_proba(X)[0]
-            prediction_class = model_manager.drought_model.predict(X)[0]
-
-            # Map prediction class to label (assuming 1 = Drought, 0 = No Drought)
-            prediction_label = "Drought" if prediction_class == 1 else "No Drought"
-            drought_prob = float(prediction_proba[1]) * 100
-            no_drought_prob = float(prediction_proba[0]) * 100
-
-        except Exception as e:
-            logger.error(f"Model prediction error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Prediction error: {str(e)}"
+            prediction_label, drought_prob, no_drought_prob = predict_drought_probability(
+                model_manager.drought_model,
+                X,
             )
+        except Exception as e:
+            logger.warning(f"Model prediction failed, falling back to SPI rule: {str(e)}")
+            prediction_label, drought_prob, no_drought_prob = drought_risk_from_spi(spi)
 
         # Get climate data
         climate_data = ClimateData(
@@ -410,7 +447,11 @@ async def predict(
             temperature=float(city_data.iloc[0]['temperature_2m_mean']),
             et0=float(city_data.iloc[0]['et0_fao_evapotranspiration']),
             water_balance=float(city_data.iloc[0]['water_balance']),
-            spi=float(city_data.iloc[0]['SPI'])
+            spi=spi,
+            spi_category=str(city_data.iloc[0].get(
+                'spi_category',
+                classify_spi(spi),
+            )),
         )
 
         # Get last 6 months data
@@ -477,15 +518,19 @@ async def get_map_data(
                 city_data = city_data.copy()
                 city_data['city_encoded'] = city_encoded
 
-                X = city_data[features_cols].fillna(0).values
+                X = city_data[features_cols].fillna(0)
                 if len(X) > 1:
-                    X = X[0:1]
+                    X = X.iloc[0:1]
 
-                # Prediction
-                prediction_proba = model_manager.drought_model.predict_proba(X)[0]
-                prediction_class = model_manager.drought_model.predict(X)[0]
-                prediction_label = "Drought" if prediction_class == 1 else "No Drought"
-                drought_prob = float(prediction_proba[1]) * 100
+                spi = float(city_data.iloc[0]['SPI'])
+                try:
+                    prediction_label, drought_prob, _ = predict_drought_probability(
+                        model_manager.drought_model,
+                        X,
+                    )
+                except Exception as e:
+                    logger.warning(f"Model prediction failed for {city}, falling back to SPI rule: {str(e)}")
+                    prediction_label, drought_prob, _ = drought_risk_from_spi(spi)
 
                 # Get coordinates
                 coords = model_manager.get_city_coordinates(city)
@@ -495,7 +540,9 @@ async def get_map_data(
                         lat=coords[0],
                         lng=coords[1],
                         prediction=prediction_label,
-                        drought_probability=round(drought_prob, 1)
+                        drought_probability=round(drought_prob, 1),
+                        spi=round(spi, 2),
+                        spi_category=str(city_data.iloc[0].get('spi_category', classify_spi(spi))),
                     ))
             except Exception as e:
                 logger.warning(f"Error processing {city}: {str(e)}")
@@ -537,20 +584,14 @@ async def get_history(city: str = Query(..., min_length=1)) -> HistoryResponse:
 
         history_data = []
         for _, row in city_data.iterrows():
-            # Predict for each historical point
-            features_cols = FEATURE_COLUMNS
-
-            row = row.copy()
-            row['city_encoded'] = model_manager.encode_city(city)
-
-            X = row[features_cols].fillna(0).values.reshape(1, -1)
-            prediction_proba = model_manager.drought_model.predict_proba(X)[0]
-            prediction_class = model_manager.drought_model.predict(X)[0]
-            label = "Drought" if prediction_class == 1 else "No Drought"
+            spi = float(row['SPI'])
+            spi_category = str(row.get('spi_category', classify_spi(spi)))
+            label = "Drought" if spi <= -1.0 else "No Drought"
 
             history_data.append(HistoryDataPoint(
                 date=row['time'].strftime('%Y-%m-%d'),
-                spi=float(row['SPI']),
+                spi=spi,
+                spi_category=spi_category,
                 precipitation=float(row['precipitation_sum']),
                 label=label
             ))

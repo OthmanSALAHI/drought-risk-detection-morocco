@@ -1,11 +1,33 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from statistics import NormalDist
 
-# Load your data
+try:
+    from scipy.stats import gamma
+except ImportError:
+    gamma = None
+
+
+SPI_WINDOW_MONTHS = 3
+STANDARD_NORMAL = NormalDist()
+
+
+# Load source data
 df = pd.read_csv("data/morocco_climate_data.csv")
 
-# ✅ FIX 1 — Handle mixed datetime formats (with and without " 00:00:00")
+# Handle mixed datetime formats (with and without " 00:00:00")
 df["time"] = pd.to_datetime(df["time"], format="mixed")
+
+# Some cities appear more than once for the same month. Keep one monthly
+# climate observation per city so the SPI climatology is not overweighted.
+df = (
+    df.groupby(["city", "time"], as_index=False)
+    .agg({
+        "precipitation_sum": "mean",
+        "temperature_2m_mean": "mean",
+        "et0_fao_evapotranspiration": "mean",
+    })
+)
 
 # Sort by city and time
 df = df.sort_values(["city", "time"]).reset_index(drop=True)
@@ -16,19 +38,61 @@ df = df.sort_values(["city", "time"]).reset_index(drop=True)
 df["water_balance"] = df["precipitation_sum"] - df["et0_fao_evapotranspiration"]
 
 # ============================================
-# FEATURE 2 — SPI (uses precipitation_sum)
+# FEATURE 2 - SPI-3 (uses 3-month accumulated precipitation)
 # ============================================
-def calculate_spi(group, column="precipitation_sum", window=3):
-    rolling = group[column].rolling(window=window, min_periods=1).sum()
-    mean = rolling.mean()
-    std = rolling.std()
-    spi = (rolling - mean) / (std + 1e-8)
-    return spi
+def empirical_spi(values: pd.Series) -> pd.Series:
+    """Fallback SPI estimate using plotting positions when gamma fit is weak."""
+    result = pd.Series(np.nan, index=values.index, dtype=float)
+    valid = values.dropna()
+    if valid.empty:
+        return result
 
-df["SPI"] = df.groupby("city", group_keys=False).apply(calculate_spi)
+    ranks = valid.rank(method="average")
+    probabilities = (ranks - 0.44) / (len(valid) + 0.12)
+    probabilities = probabilities.clip(1e-6, 1 - 1e-6)
+    result.loc[valid.index] = probabilities.map(STANDARD_NORMAL.inv_cdf)
+    return result
+
+
+def calculate_spi(values: pd.Series) -> pd.Series:
+    """Compute SPI from accumulated precipitation for one city/month climatology."""
+    result = pd.Series(np.nan, index=values.index, dtype=float)
+    valid = values.dropna()
+    if valid.empty:
+        return result
+
+    positive = valid[valid > 0]
+    zero_probability = (valid == 0).mean()
+
+    if gamma is None or len(positive) < 4 or positive.nunique() < 2:
+        return empirical_spi(values)
+
+    try:
+        shape, loc, scale = gamma.fit(positive, floc=0)
+        probabilities = zero_probability + (1 - zero_probability) * gamma.cdf(
+            valid,
+            a=shape,
+            loc=loc,
+            scale=scale,
+        )
+        probabilities = pd.Series(probabilities, index=valid.index).clip(1e-6, 1 - 1e-6)
+        result.loc[valid.index] = probabilities.map(STANDARD_NORMAL.inv_cdf)
+        return result
+    except Exception:
+        return empirical_spi(values)
+
+
+df["month"] = df["time"].dt.month
+df["spi_3_month_precipitation"] = df.groupby("city")["precipitation_sum"].transform(
+    lambda x: x.rolling(SPI_WINDOW_MONTHS, min_periods=SPI_WINDOW_MONTHS).sum()
+)
+
+# SPI is standardized separately for each city and calendar month. That keeps
+# July in a dry city from being judged against wet-season months or wet cities.
+df["SPI"] = df.groupby(["city", "month"])["spi_3_month_precipitation"].transform(calculate_spi)
 
 # ============================================
-# FEATURE 3 — Lag Features (previous months)
+# FEATURE 3 - Lag Features (previous months)
 # ============================================
 for lag in [1, 2, 3]:
     df[f"precip_lag{lag}"] = df.groupby("city")["precipitation_sum"].shift(lag)
@@ -43,9 +107,8 @@ df["temp_rolling3"]   = df.groupby("city")["temperature_2m_mean"].transform(lamb
 df["et0_rolling3"]    = df.groupby("city")["et0_fao_evapotranspiration"].transform(lambda x: x.rolling(3).mean())
 
 # ============================================
-# FEATURE 5 — Seasonality
+# FEATURE 5 - Seasonality
 # ============================================
-df["month"] = df["time"].dt.month
 df["season"] = df["month"].map({
     12: "Winter", 1: "Winter", 2: "Winter",
     3:  "Spring", 4: "Spring", 5: "Spring",
@@ -55,25 +118,28 @@ df["season"] = df["month"].map({
 df["season_encoded"] = df["season"].map({"Winter":0, "Spring":1, "Summer":2, "Autumn":3})
 
 # ============================================
-# LABEL — ✅ FIX 2: Use percentiles for balanced classes
+# LABEL - Real-world SPI drought thresholds
 # ============================================
-low  = df["SPI"].quantile(0.33)
-high = df["SPI"].quantile(0.66)
+def classify_spi(spi: float) -> str:
+    if pd.isna(spi):
+        return np.nan
+    if spi <= -2.0:
+        return "Extremely Dry"
+    if spi <= -1.5:
+        return "Severely Dry"
+    if spi <= -1.0:
+        return "Moderately Dry"
+    if spi < 1.0:
+        return "Near Normal"
+    if spi < 1.5:
+        return "Moderately Wet"
+    if spi < 2.0:
+        return "Very Wet"
+    return "Extremely Wet"
 
-print(f"📊 SPI thresholds from your data:")
-print(f"   Severe   → SPI ≤ {low:.2f}")
-print(f"   Moderate → SPI ≤ {high:.2f}")
-print(f"   Normal   → SPI > {high:.2f}")
 
-def classify_drought(spi):
-    if spi <= low:
-        return "Severe"
-    elif spi <= high:
-        return "Moderate"
-    else:
-        return "Normal"
-
-df["drought_label"] = df["SPI"].apply(classify_drought)
+df["spi_category"] = df["SPI"].apply(classify_spi)
+df["drought_label"] = np.where(df["SPI"] <= -1.0, "Drought", "No Drought")
 
 # ============================================
 # Drop rows with NaN (from lag/rolling)
@@ -84,10 +150,14 @@ df = df.dropna().reset_index(drop=True)
 df.to_csv("data/morocco_climate_features.csv", index=False)
 
 # Preview
-print(f"\n✅ Dataset shape: {df.shape}")
-print(f"\n📊 Drought label distribution:")
+print(f"\nDataset shape: {df.shape}")
+print(f"\nSPI-3 category distribution:")
+print(df["spi_category"].value_counts())
+print(f"\nDrought label distribution:")
 print(df["drought_label"].value_counts())
-print(f"\n📊 Drought label percentage:")
+print(f"\nDrought label percentage:")
 print((df["drought_label"].value_counts(normalize=True) * 100).round(1))
-print(f"\n🔍 Sample row:")
+print(f"\nSPI summary:")
+print(df["SPI"].describe())
+print(f"\nSample row:")
 print(df[df["city"] == "Casablanca"].head(3).T)

@@ -8,6 +8,7 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { usePrediction } from '../hooks/usePrediction';
 import { CITY_NAMES } from '../constants/cities';
+import { formatDecimal } from '../utils/format';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -215,6 +216,9 @@ export const Predict: React.FC = () => {
                         <p className="text-slate-400 mb-4">
                           {result.city} &mdash; {months[result.month - 1]} {result.year}
                         </p>
+                        <div className="inline-flex items-center px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-sm text-slate-300 mb-4">
+                          SPI category: <span className="ml-1 font-semibold text-white">{result.climate_data.spi_category}</span>
+                        </div>
 
                         <div className="w-full max-w-md">
                           <div className="flex justify-between text-sm mb-1">
@@ -223,8 +227,8 @@ export const Predict: React.FC = () => {
                               result.prediction === 'Drought' ? 'text-red-400' : 'text-emerald-400'
                             }`}>
                               {result.prediction === 'Drought'
-                                ? result.drought_probability
-                                : result.no_drought_probability}%
+                                ? formatDecimal(result.drought_probability)
+                                : formatDecimal(result.no_drought_probability)}%
                             </span>
                           </div>
                           <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
@@ -244,10 +248,10 @@ export const Predict: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                      { icon: CloudRain, label: 'Rainfall', value: `${result.climate_data.precipitation} mm`, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-                      { icon: Thermometer, label: 'Temperature', value: `${result.climate_data.temperature} °C`, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-                      { icon: Droplets, label: 'Water Balance', value: `${result.climate_data.water_balance} mm`, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-                      { icon: BarChart3, label: 'SPI Index', value: result.climate_data.spi.toFixed(2), color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                      { icon: CloudRain, label: 'Rainfall', value: `${formatDecimal(result.climate_data.precipitation)} mm`, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                      { icon: Thermometer, label: 'Temperature', value: `${formatDecimal(result.climate_data.temperature)} °C`, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+                      { icon: Droplets, label: 'Water Balance', value: `${formatDecimal(result.climate_data.water_balance)} mm`, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+                      { icon: BarChart3, label: result.climate_data.spi_category, value: formatDecimal(result.climate_data.spi), color: 'text-purple-400', bg: 'bg-purple-500/10' },
                     ].map((item, i) => (
                       <GlassCard key={i} delay={i * 0.1} className="p-5">
                         <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center mb-3`}>

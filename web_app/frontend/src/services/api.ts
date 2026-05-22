@@ -33,6 +33,7 @@ const mockPrediction = (city: string, month: number, year: number): PredictionRe
       et0: parseFloat((100 + Math.random() * 150).toFixed(1)),
       water_balance: parseFloat((-200 + Math.random() * 100).toFixed(1)),
       spi: parseFloat((-2 + Math.random() * 3).toFixed(2)),
+      spi_category: isDrought ? 'Moderately Dry' : 'Near Normal',
     },
     last_6_months: months.map(m => ({
       month: m,
@@ -69,6 +70,8 @@ const mockMap = (month: number, year: number): MapResponse => {
         ...c,
         prediction: isDrought ? 'Drought' : 'No Drought',
         drought_probability: parseFloat(prob.toFixed(1)),
+        spi: isDrought ? -1.2 : 0.2,
+        spi_category: isDrought ? 'Moderately Dry' : 'Near Normal',
       };
     }),
   };
@@ -82,6 +85,7 @@ const mockHistory = (city: string): HistoryResponse => {
       data.push({
         date: `${year}-${String(month).padStart(2, '0')}-01`,
         spi: parseFloat(spi.toFixed(2)),
+        spi_category: spi < -2 ? 'Extremely Dry' : spi < -1.5 ? 'Severely Dry' : spi < -1 ? 'Moderately Dry' : 'Near Normal',
         precipitation: parseFloat((Math.random() * 80).toFixed(1)),
         label: spi < -1 ? 'Drought' : 'No Drought',
       });

@@ -45,7 +45,7 @@ MAX_CONTENT_LENGTH = 1024 * 1024  # 1MB
 
 # Feature Engineering
 FEATURES_FOR_PREDICTION = [
-    'precipitation_sum', 'temperature_2m_mean', 'et0_fao_evapotranspiration',
+    'city_encoded', 'precipitation_sum', 'temperature_2m_mean', 'et0_fao_evapotranspiration',
     'water_balance', 'SPI', 'precip_lag1', 'temp_lag1', 'precip_lag2',
     'temp_lag2', 'precip_lag3', 'temp_lag3', 'precip_rolling3',
     'precip_rolling6', 'temp_rolling3', 'et0_rolling3', 'season_encoded'

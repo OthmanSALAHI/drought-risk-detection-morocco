@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { getHistory } from '../services/api';
 import { HistoryResponse, DroughtEvent } from '../types';
 import { CITY_NAMES } from '../constants/cities';
+import { formatDecimal } from '../utils/format';
 import {
   LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, ReferenceLine,
@@ -92,8 +93,8 @@ export const History: React.FC = () => {
     return {
       totalDroughtMonths: droughtMonths,
       worstYear: worstYear?.year ?? 2000,
-      avgAnnualRainfall: avgRainfall.toFixed(1),
-      droughtFrequency: droughtFreq,
+      avgAnnualRainfall: avgRainfall,
+      droughtFrequency: Number(droughtFreq),
     };
   }, [data]);
 
@@ -159,8 +160,8 @@ export const History: React.FC = () => {
               {[
                 { icon: Calendar, label: 'Drought Months', value: stats?.totalDroughtMonths ?? 0, color: 'text-red-400' },
                 { icon: TrendingDown, label: 'Worst Year', value: stats?.worstYear ?? '-', color: 'text-orange-400' },
-                { icon: CloudRain, label: 'Avg Rainfall', value: `${stats?.avgAnnualRainfall ?? 0} mm`, color: 'text-blue-400' },
-                { icon: BarChart3, label: 'Drought Freq', value: `${stats?.droughtFrequency ?? 0}%`, color: 'text-purple-400' },
+                { icon: CloudRain, label: 'Avg Rainfall', value: `${formatDecimal(stats?.avgAnnualRainfall ?? 0)} mm`, color: 'text-blue-400' },
+                { icon: BarChart3, label: 'Drought Freq', value: `${formatDecimal(stats?.droughtFrequency ?? 0)}%`, color: 'text-purple-400' },
               ].map((item, i) => (
                 <GlassCard key={i} delay={i * 0.1} className="p-5">
                   <div className="flex items-center gap-3 mb-2">
