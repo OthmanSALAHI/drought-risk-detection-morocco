@@ -4,6 +4,7 @@ import {
   MapResponse,
   HistoryResponse,
   HealthResponse,
+  ImpactResponse,
 } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -95,6 +96,22 @@ const mockHistory = (city: string): HistoryResponse => {
   return { city, data };
 };
 
+const mockImpact = (city: string, month: number, year: number): ImpactResponse => ({
+  city, month, year,
+  spi: -1.45,
+  spi_category: 'Moderately Dry',
+  drought_severity: 'Moderate',
+  crop_risks: [
+    { crop: 'barley', crop_label: 'Barley', icon: '🌾', vulnerability: 'Very High', vulnerability_score: 82, estimated_yield_loss_pct: 28.5, estimated_production_loss_tonnes: 45200, estimated_economic_loss_mad: 126560000 },
+    { crop: 'soft_wheat', crop_label: 'Soft Wheat', icon: '🌿', vulnerability: 'High', vulnerability_score: 65, estimated_yield_loss_pct: 21.3, estimated_production_loss_tonnes: 112000, estimated_economic_loss_mad: 313600000 },
+    { crop: 'olives', crop_label: 'Olives', icon: '🫒', vulnerability: 'Low', vulnerability_score: 22, estimated_yield_loss_pct: 8.2, estimated_production_loss_tonnes: 15400, estimated_economic_loss_mad: 92400000 },
+  ],
+  total_estimated_loss_mad: 532560000,
+  total_loss_formatted: '532.6M MAD',
+  regional_context: { region: 'Marrakech-Safi', primary_crops: 'Soft Wheat, Olives', rain_fed_pct: 80, cereal_share_pct: 12 },
+  historical_comparison: { year: 2022, spi: -1.8, prod_drop_pct: 58 },
+});
+
 export const USE_MOCK = false;
 
 export const predictDrought = async (
@@ -133,5 +150,18 @@ export const getHistory = async (city: string): Promise<HistoryResponse> => {
     return mockHistory(city);
   }
   const res = await api.get('/history', { params: { city } });
+  return res.data;
+};
+
+export const getEconomicImpact = async (
+  city: string,
+  month: number,
+  year: number,
+): Promise<ImpactResponse> => {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 900));
+    return mockImpact(city, month, year);
+  }
+  const res = await api.get('/impact', { params: { city, month, year } });
   return res.data;
 };

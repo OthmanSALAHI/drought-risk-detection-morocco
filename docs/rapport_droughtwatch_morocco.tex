@@ -1,0 +1,681 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+\geometry{margin=2.5cm}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue
+}
+
+% ─── Python code style ────────────────────────────────────────────────────────
+\lstdefinestyle{pythonStyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    stringstyle=\color{green!40!black},
+    commentstyle=\color{gray}\itshape,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=8pt,
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    captionpos=b,
+    showstringspaces=false
+}
+
+% ─── JSON / shell style ───────────────────────────────────────────────────────
+\lstdefinestyle{jsonStyle}{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!70!black},
+    stringstyle=\color{green!40!black},
+    morestring=[b]",
+    frame=single,
+    breaklines=true,
+    tabsize=2,
+    captionpos=b,
+    showstringspaces=false
+}
+
+% ─── Colour definitions ───────────────────────────────────────────────────────
+\definecolor{droughtRed}{RGB}{220,38,38}
+\definecolor{normalGreen}{RGB}{34,197,94}
+\definecolor{accentBlue}{RGB}{59,130,246}
+\definecolor{sectionGray}{RGB}{71,85,105}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════════════════════
+%  TITLE PAGE
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{titlepage}
+    \centering
+    \vspace*{0.5cm}
+
+    \includegraphics[width=0.42\textwidth]{logo_university.png}
+
+    \vspace{1.5cm}
+
+    {\Large \textbf{Faculté des Sciences Ben M'Sik}}\\[0.3cm]
+    {\large Université Hassan II de Casablanca}\\[1.5cm]
+
+    {\Huge \textbf{Rapport de Projet}}\\[0.4cm]
+    {\LARGE Intelligence Artificielle et Systèmes Embarqués}\\[1.2cm]
+
+    \rule{0.85\textwidth}{0.5pt}\\[0.4cm]
+    {\Large \textbf{DroughtWatch Morocco}}\\[0.2cm]
+    {\large Système de Prédiction et d'Impact Économique\\de la Sécheresse au Maroc}\\[0.4cm]
+    \rule{0.85\textwidth}{0.5pt}
+
+    \vfill
+
+    \begin{flushleft}
+        \Large
+        \textbf{Réalisé par :} Othman Salahi\\[0.3cm]
+        \textbf{Module :} Intelligence Artificielle / Data Science\\[0.3cm]
+        \textbf{Encadrants :} A. Ettaoufik, R. Azeroual\\[0.3cm]
+        \textbf{Année universitaire :} 2025--2026
+    \end{flushleft}
+
+    \vspace{1cm}
+\end{titlepage}
+
+% ══════════════════════════════════════════════════════════════════════════════
+%  TABLE OF CONTENTS
+% ══════════════════════════════════════════════════════════════════════════════
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+%  INTRODUCTION
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
+
+Le Maroc est l'un des pays les plus touchés par la variabilité climatique en Afrique du Nord. Les sécheresses récurrentes, notamment celles de 2005, 2016, 2022 et 2024, ont provoqué des chutes de production céréalière allant jusqu'à 83\% par rapport aux années normales, selon les données du Haut-Commissariat au Plan (HCP). Face à ces enjeux, la capacité à \textit{anticiper} la sécheresse et à en \textit{quantifier l'impact économique agricole} représente un levier stratégique pour la sécurité alimentaire nationale.
+
+Ce projet, intitulé \textbf{DroughtWatch Morocco}, a pour objectif de concevoir et déployer un système complet d'aide à la décision qui combine :
+\begin{itemize}
+    \item un \textbf{modèle d'apprentissage automatique} (Random Forest) entraîné sur 25 ans de données climatiques pour 44 villes marocaines ;
+    \item un \textbf{moteur d'impact économique agricole} qui traduit la sévérité de la sécheresse (mesurée par l'Indice de Précipitation Standardisé — SPI) en estimations de pertes de rendement et de manque à gagner en Dirhams marocains (MAD) ;
+    \item une \textbf{application web full-stack} (FastAPI + React) offrant une interface interactive pour tout utilisateur, qu'il soit chercheur, décideur ou citoyen.
+\end{itemize}
+
+\vspace{0.3cm}
+Ce rapport présente l'ensemble du projet : contexte scientifique, données utilisées, pipeline de traitement, modélisation, architecture logicielle et résultats.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Contexte et Objectifs}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Contexte scientifique}
+
+La sécheresse est un phénomène climatique complexe qui se manifeste par un déficit prolongé de précipitations par rapport aux normales climatiques. Au Maroc, 80\% des terres agricoles sont pluviales (non irriguées), rendant les rendements céréaliers extrêmement sensibles aux variations interannuelles de précipitations.
+
+L'Indice de Précipitation Standardisé (SPI), développé par McKee \textit{et al.} (1993), est l'indice de référence de l'Organisation Météorologique Mondiale (OMM) pour la surveillance de la sécheresse. Il mesure l'écart de précipitation par rapport à la normale historique, exprimé en déviations-types :
+
+\begin{equation}
+    \text{SPI} = \Phi^{-1}\!\left(F_\Gamma(P_{acc})\right)
+\end{equation}
+
+où $P_{acc}$ est la précipitation accumulée sur la fenêtre temporelle considérée (3 mois dans ce projet, noté SPI-3), $F_\Gamma$ est la fonction de distribution cumulative Gamma ajustée sur la climatologie locale, et $\Phi^{-1}$ est la transformation inverse de la loi normale standard.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{3.5cm}p{5cm}p{5cm}}
+        \toprule
+        Valeur SPI & Catégorie & Fréquence \\
+        \midrule
+        $\leq -2{,}0$ & Extrêmement sec & $\approx 2{,}3\%$ des mois \\
+        $-2{,}0$ à $-1{,}5$ & Sévèrement sec & $\approx 4{,}4\%$ des mois \\
+        $-1{,}5$ à $-1{,}0$ & Modérément sec & $\approx 9{,}2\%$ des mois \\
+        $-1{,}0$ à $+1{,}0$ & Normal & $\approx 68{,}2\%$ des mois \\
+        $> +1{,}0$ & Humide & $\approx 15{,}9\%$ des mois \\
+        \bottomrule
+    \end{tabular}
+    \caption{Classification standard de la sécheresse par SPI (OMM)}
+\end{table}
+
+Dans ce projet, le seuil de \textbf{SPI $\leq -1{,}0$} est utilisé pour définir une situation de sécheresse, conformément aux recommandations de l'OMM.
+
+\section{Objectifs du projet}
+
+\begin{enumerate}
+    \item \textbf{Collecter} des données climatiques mensuelles (précipitations, température, évapotranspiration) pour 44 villes marocaines sur la période 2000--2025 via l'API Open-Meteo.
+    \item \textbf{Calculer} l'indice SPI-3 par ville et par mois calendaire, et \textbf{générer un jeu de données} de 18 variables explicatives.
+    \item \textbf{Entraîner} un classifieur Random Forest pour prédire la présence ou l'absence de sécheresse avec estimation de probabilité.
+    \item \textbf{Développer} un moteur d'impact économique traduisant le SPI prédit en pertes agricoles estimées (MAD) par culture.
+    \item \textbf{Déployer} l'ensemble dans une application web interactive accessible aux décideurs et chercheurs.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Environnement de Développement}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{4.5cm}p{9cm}}
+        \toprule
+        Composant & Description \\
+        \midrule
+        Système d'exploitation & Windows 11 / Linux (Ubuntu via WSL2) \\
+        Langage Backend & Python 3.10 \\
+        Framework API & FastAPI + Uvicorn \\
+        ML / Data & scikit-learn, pandas, NumPy, SciPy \\
+        Langage Frontend & TypeScript 5 + React 18 \\
+        Build Frontend & Vite 5 \\
+        Visualisation & Recharts, React-Leaflet \\
+        Animations & Framer Motion \\
+        Éditeur & Visual Studio Code \\
+        Contrôle de version & Git / GitHub \\
+        Outil de test API & Swagger UI (intégré FastAPI) \\
+        Ports utilisés & Backend : 8000 — Frontend : 5173 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Environnement technique du projet}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Architecture Générale}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Vue d'ensemble}
+
+Le système adopte une architecture \textbf{client-serveur à trois couches} :
+
+\begin{enumerate}
+    \item \textbf{Couche données} : fichiers CSV hébergeant les données climatiques traitées, les données agricoles et la cartographie ville/culture.
+    \item \textbf{Couche applicative} : API REST FastAPI exposant quatre endpoints, chargeant le modèle ML et le moteur d'impact au démarrage.
+    \item \textbf{Couche présentation} : SPA (Single Page Application) React + Vite, consommant l'API via Axios.
+\end{enumerate}
+
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Pipeline de Données}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Collecte des données climatiques}
+
+Le script \texttt{scripts/data.py} interroge l'API \textit{Open-Meteo Historical Weather} pour chacune des 44 villes marocaines. Les variables récupérées à granularité mensuelle sont :
+
+\begin{itemize}
+    \item \texttt{precipitation\_sum} : total mensuel des précipitations (mm) ;
+    \item \texttt{temperature\_2m\_mean} : température moyenne mensuelle à 2 m (°C) ;
+    \item \texttt{et0\_fao\_evapotranspiration} : évapotranspiration de référence FAO-56 (mm).
+\end{itemize}
+
+La période couverte est \textbf{janvier 2000 – avril 2025}, soit jusqu'à 300 observations par ville.
+
+\section{Ingénierie des variables}
+
+Le script \texttt{scripts/preprocess\_data.py} génère le jeu de données final \texttt{morocco\_climate\_features.csv} à travers les étapes suivantes :
+
+\subsection{Bilan hydrique}
+\begin{equation}
+    \text{water\_balance} = P_{sum} - \text{ET}_0
+\end{equation}
+
+\subsection{Calcul du SPI-3}
+
+L'indice SPI est calculé séparément pour chaque paire \textit{(ville, mois calendaire)} afin de préserver la saisonnalité :
+
+\begin{lstlisting}[style=pythonStyle, caption={Calcul du SPI-3 par ville et mois calendaire}]
+def calculate_spi(values: pd.Series) -> pd.Series:
+    """Ajustement Gamma + transformation normale."""
+    valid = values.dropna()
+    positive = valid[valid > 0]
+    zero_probability = (valid == 0).mean()
+
+    shape, loc, scale = gamma.fit(positive, floc=0)
+    probabilities = zero_probability + (1 - zero_probability) * gamma.cdf(
+        valid, a=shape, loc=loc, scale=scale
+    )
+    probabilities = probabilities.clip(1e-6, 1 - 1e-6)
+    return probabilities.map(NormalDist().inv_cdf)
+
+# Application par groupe (ville × mois calendaire)
+df["SPI"] = df.groupby(["city", "month"])[
+    "spi_3_month_precipitation"
+].transform(calculate_spi)
+\end{lstlisting}
+
+En cas d'échec du fit Gamma (données insuffisantes), un estimateur empirique basé sur les positions de rang (méthode de Hazen) est utilisé en repli.
+
+\subsection{Variables décalées et moyennes mobiles}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{4cm}p{9cm}}
+        \toprule
+        Groupe & Variables générées \\
+        \midrule
+        Décalage temporel & \texttt{precip\_lag1/2/3}, \texttt{temp\_lag1/2/3} \\
+        Moyennes mobiles & \texttt{precip\_rolling3/6}, \texttt{temp\_rolling3}, \texttt{et0\_rolling3} \\
+        Saisonnalité & \texttt{month}, \texttt{season\_encoded} (Hiver=0 ... Automne=3) \\
+        \bottomrule
+    \end{tabular}
+    \caption{Résumé des variables temporelles construites}
+\end{table}
+
+\subsection{Étiquetage}
+
+\begin{lstlisting}[style=pythonStyle, caption={Étiquetage binaire basé sur le seuil SPI OMM}]
+df["drought_label"] = np.where(df["SPI"] <= -1.0, "Drought", "No Drought")
+\end{lstlisting}
+
+Le seuil $\text{SPI} \leq -1{,}0$ est le seuil standard de l'Organisation Météorologique Mondiale pour déclarer une \textit{sécheresse modérée à sévère}.
+
+\section{Jeu de données final}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{5cm}p{7cm}}
+        \toprule
+        Caractéristique & Valeur \\
+        \midrule
+        Nombre de villes & 44 \\
+        Période & Janvier 2000 – Avril 2025 \\
+        Nombre de variables & 18 (+ variable cible) \\
+        Nombre d'observations & $\approx$ 10\,000 lignes \\
+        Taux de sécheresse & $\approx$ 22\% des observations \\
+        \bottomrule
+    \end{tabular}
+    \caption{Caractéristiques du jeu de données}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Modèle de Machine Learning}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Choix du modèle}
+
+L'algorithme \textbf{Random Forest} a été sélectionné pour les raisons suivantes :
+
+\begin{itemize}
+    \item Il gère nativement les variables de natures différentes (continues, entières, catégorielles encodées) sans normalisation.
+    \item Il est robuste aux valeurs aberrantes, fréquentes dans les données climatiques.
+    \item Il fournit des probabilités de classe (\texttt{predict\_proba}) nécessaires à l'affichage de la confiance du modèle dans l'interface.
+    \item Il intègre un mécanisme de pondération de classes (\texttt{class\_weight='balanced'}) adapté au déséquilibre entre sécheresse ($\approx$22\%) et non-sécheresse ($\approx$78\%).
+    \item Son interprétabilité partielle (importance des variables) facilite la validation scientifique.
+\end{itemize}
+
+\section{Configuration et entraînement}
+
+\begin{lstlisting}[style=pythonStyle, caption={Configuration du Random Forest (train\_models.py)}]
+model = RandomForestClassifier(
+    n_estimators=300,       # Nombre d'arbres de décision
+    random_state=42,        # Reproductibilité
+    class_weight='balanced',# Corrige le déséquilibre des classes
+    n_jobs=-1,              # Parallélisation sur tous les cœurs CPU
+    min_samples_leaf=2,     # Limite le surapprentissage
+)
+model.fit(X_train, y_train)
+\end{lstlisting}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{4.5cm}p{4cm}p{5cm}}
+        \toprule
+        Paramètre & Valeur & Justification \\
+        \midrule
+        \texttt{n\_estimators} & 300 & Stabilité des probabilités \\
+        \texttt{class\_weight} & \texttt{'balanced'} & Classe minoritaire (sécheresse) \\
+        \texttt{min\_samples\_leaf} & 2 & Réduction du surapprentissage \\
+        \texttt{random\_state} & 42 & Reproductibilité \\
+        Découpage train/test & 80\% / 20\% & Stratifié par classe cible \\
+        \bottomrule
+    \end{tabular}
+    \caption{Hyperparamètres du modèle}
+\end{table}
+
+\section{Variables d'entrée}
+
+Les 18 variables utilisées pour l'inférence sont :
+
+\begin{lstlisting}[style=pythonStyle, caption={Liste des 18 variables du modèle}]
+FEATURE_COLUMNS = [
+    'city_encoded',          # Encodage numérique de la ville
+    'precipitation_sum',     # Précipitations du mois (mm)
+    'temperature_2m_mean',   # Température moyenne (°C)
+    'et0_fao_evapotranspiration',  # ET0 de référence (mm)
+    'water_balance',         # Bilan hydrique (P - ET0)
+    'SPI',                   # Indice SPI-3
+    'precip_lag1', 'precip_lag2', 'precip_lag3',  # Précip. mois précédents
+    'temp_lag1', 'temp_lag2', 'temp_lag3',         # Temp. mois précédents
+    'precip_rolling3', 'precip_rolling6',           # Moyennes mobiles
+    'temp_rolling3', 'et0_rolling3',                # Moyennes mobiles
+    'month',                 # Mois calendaire (1-12)
+    'season_encoded',        # Saison (0=Hiver, 1=Printemps...)
+]
+\end{lstlisting}
+
+\section{Gestion des dates futures}
+
+Pour permettre des prédictions au-delà de la période d'entraînement (après avril 2025), le système utilise la stratégie de \textbf{repli sur le mois le plus récent identique} :
+
+\begin{lstlisting}[style=pythonStyle, caption={Repli sur données historiques pour dates futures}]
+def get_city_data_or_estimate(self, city, year, month):
+    # 1. Recherche exacte
+    city_data = self.get_city_data(city, year, month)
+    if city_data is not None:
+        return city_data
+
+    # 2. Repli : observation la plus récente pour ce mois calendaire
+    fallback = self.features_df[
+        (self.features_df['city'].str.lower() == city.lower()) &
+        (self.features_df['time'].dt.month == month)
+    ].sort_values('time', ascending=False).head(1).copy()
+
+    if len(fallback) > 0:
+        fallback['time'] = pd.Timestamp(year=year, month=month, day=1)
+        return fallback
+    return None
+\end{lstlisting}
+
+Cette approche permet de générer des prédictions pour n'importe quel mois futur en utilisant la climatologie récente de la ville comme approximation.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Moteur d'Impact Économique Agricole}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Motivation}
+
+Un système de prédiction de sécheresse n'est réellement utile aux décideurs que s'il quantifie les conséquences concrètes. L'idée centrale de cette composante est de connecter la sécheresse à des \textbf{pertes économiques agricoles réelles}, en se concentrant sur les principales filières céréalières et oléicoles du Maroc.
+
+\section{Méthodologie}
+
+Le moteur s'appuie sur des \textbf{coefficients de sensibilité SPI-rendement} ($\beta$) issus d'études empiriques du CGIAR/ICARDA sur la corrélation SPI-rendement au Maroc ($R^2 \approx 0{,}3$--$0{,}6$).
+
+\subsection{Perte de rendement estimée}
+
+\begin{equation}
+    \text{Perte de rendement (\%)} = \min\!\left(85,\; \max\!\left(0,\; \beta \cdot |\text{SPI} - S_0| \cdot 100\right)\right) \quad \text{si } \text{SPI} < S_0
+\end{equation}
+
+où $S_0$ est le seuil de stress spécifique à la culture et $\beta$ le coefficient de sensibilité.
+
+\subsection{Perte de production}
+
+\begin{equation}
+    \text{Perte de production (t)} = P_{base} \times r_{région} \times \frac{\text{Perte de rendement}}{100}
+\end{equation}
+
+où $P_{base}$ est la production nationale de référence (moyenne sur 5 ans) et $r_{région}$ la part régionale de la production nationale.
+
+\subsection{Perte économique}
+
+\begin{equation}
+    \text{Perte économique (MAD)} = \text{Perte de production (t)} \times 10 \times p_{\text{MAD/quintal}}
+\end{equation}
+
+Le facteur 10 convertit les tonnes en quintaux (1 tonne = 10 quintaux).
+
+\section{Cultures et coefficients}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{3cm}p{2cm}p{3cm}p{5.5cm}}
+        \toprule
+        Culture & $\beta$ & Seuil $S_0$ & Remarque \\
+        \midrule
+        Orge & 0,20 & SPI $< -0{,}5$ & Plus vulnérable — terres marginales pluviales \\
+        Blé dur & 0,16 & SPI $< -0{,}8$ & Résistance intermédiaire \\
+        Blé tendre & 0,15 & SPI $< -0{,}8$ & Zones irriguées partiellement tamponnées \\
+        Olivier & 0,07 & SPI $< -1{,}2$ & Arbre à racines profondes — plus résilient \\
+        \bottomrule
+    \end{tabular}
+    \caption{Coefficients de sensibilité SPI-rendement par culture}
+\end{table}
+
+\section{Prix de référence ONICL}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\bfseries}p{4cm}p{5cm}}
+        \toprule
+        Culture & Prix (MAD/quintal) \\
+        \midrule
+        Orge & 290 \\
+        Blé tendre & 320 \\
+        Blé dur & 340 \\
+        Huile d'olive & 625 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Prix de référence ONICL 2024--2025}
+\end{table}
+
+\section{Score de vulnérabilité}
+
+Un score de vulnérabilité composite (0--100) est calculé pour chaque culture, tenant compte à la fois de la perte de rendement estimée et du taux de terres pluviales de la région :
+
+\begin{equation}
+    V = \min\!\left(100,\; \text{Perte de rendement} \times \left(1 + \frac{100 - \text{irrigué}_{(\%)}}{200}\right)\right)
+\end{equation}
+
+Les seuils de classification du score $V$ sont : \textit{Très élevé} ($V \geq 75$), \textit{Élevé} (50--75), \textit{Modéré} (25--50), \textit{Faible} ($V < 25$).
+
+\section{Implémentation}
+
+\begin{lstlisting}[style=pythonStyle, caption={Extrait de impact\_engine.py — calcul de l'impact par culture}]
+def _estimate_yield_loss(self, spi: float, crop: str) -> float:
+    cfg = CROP_CONFIGS.get(crop)
+    if spi >= cfg["spi_threshold"]:
+        return 0.0   # Pas de stress en dessous du seuil
+    beta = cfg["sensitivity"]
+    severity = abs(spi - cfg["spi_threshold"])
+    return min(85.0, max(0.0, beta * severity * 100))
+
+def compute_impact(self, city, spi, month, year) -> dict:
+    crop_risks = self.estimate_crop_risks(city, spi)
+    total_loss = sum(r["estimated_economic_loss_mad"] for r in crop_risks)
+    severity = ("Extreme" if spi <= -2.0 else
+                "Severe"  if spi <= -1.5 else
+                "Moderate" if spi <= -1.0 else
+                "Mild"    if spi < 0    else "None")
+    return {
+        "crop_risks": crop_risks,
+        "total_loss_formatted": _format_mad(total_loss) if total_loss > 0
+                                else "No Impact",
+        "drought_severity": severity,
+        "regional_context": self.get_regional_context(city),
+        "historical_comparison": self._find_similar_year(spi),
+    }
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{API REST Backend}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Choix technologique}
+
+L'API REST est développée avec \textbf{FastAPI}, framework Python moderne qui génère automatiquement une documentation Swagger interactive (\texttt{/docs}) et offre une validation des paramètres via les annotations Pydantic.
+
+\section{Endpoints implémentés}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{p{2cm}p{5cm}p{6cm}}
+        \toprule
+        Méthode & URL & Description \\
+        \midrule
+        GET & \texttt{/health} & État du système, villes disponibles, plage de dates \\
+        GET & \texttt{/predict} & Prédiction de sécheresse + résumé d'impact économique \\
+        GET & \texttt{/impact} & Détail complet de l'impact économique agricole par culture \\
+        GET & \texttt{/map} & Statut SPI pour toutes les villes (données historiques) \\
+        GET & \texttt{/history} & Série temporelle SPI mensuelle pour une ville \\
+        \bottomrule
+    \end{tabular}
+    \caption{Endpoints de l'API DroughtWatch}
+\end{table}
+
+\section{Exemple de réponse — endpoint \texttt{/predict}}
+
+\begin{lstlisting}[style=jsonStyle, caption={Réponse JSON de GET /predict?city=Marrakech\&month=3\&year=2022}]
+{
+  "city": "Marrakech",
+  "month": 3,
+  "year": 2022,
+  "prediction": "Drought",
+  "drought_probability": 87.3,
+  "no_drought_probability": 12.7,
+  "climate_data": {
+    "precipitation": 4.2,
+    "temperature": 18.5,
+    "et0": 98.1,
+    "water_balance": -93.9,
+    "spi": -1.82,
+    "spi_category": "Severely Dry"
+  },
+  "last_6_months": [
+    {"month": "Oct", "precipitation": 22.1},
+    {"month": "Nov", "precipitation": 8.4},
+    {"month": "Dec", "precipitation": 3.1},
+    {"month": "Jan", "precipitation": 5.9},
+    {"month": "Feb", "precipitation": 6.2},
+    {"month": "Mar", "precipitation": 4.2}
+  ],
+  "economic_impact": {
+    "total_loss_formatted": "532.6M MAD",
+    "top_risk_crop": "Barley",
+    "top_risk_vulnerability": "Very High"
+  }
+}
+\end{lstlisting}
+
+\section{Modèles Pydantic de validation}
+
+FastAPI valide automatiquement chaque requête entrante et chaque réponse sortante grâce aux modèles Pydantic :
+
+\begin{lstlisting}[style=pythonStyle, caption={Extraits des modèles Pydantic (main.py)}]
+class ClimateData(BaseModel):
+    precipitation: float
+    temperature: float
+    et0: float
+    water_balance: float
+    spi: float
+    spi_category: str
+
+class PredictionResponse(BaseModel):
+    city: str
+    month: int
+    year: int
+    prediction: str = Field(..., pattern="^(Drought|No Drought)$")
+    drought_probability: float
+    no_drought_probability: float
+    climate_data: ClimateData
+    last_6_months: List[MonthData]
+    economic_impact: Optional[EconomicImpactSummary] = None
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Interface Utilisateur}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\section{Choix technologiques}
+
+L'interface est développée avec \textbf{React 18} et \textbf{TypeScript 5}, bundlée avec \textbf{Vite 5} pour des performances de développement optimales. Le design suit un principe de \textit{glassmorphism} sur fond sombre.
+
+Principales bibliothèques :
+\begin{itemize}
+    \item \textbf{Recharts} : graphiques interactifs (courbes, histogrammes, radars) ;
+    \item \textbf{React-Leaflet} : carte interactive des 44 villes ;
+    \item \textbf{Framer Motion} : animations fluides (entrées, jauges circulaires) ;
+    \item \textbf{Lucide React} : icônes cohérentes ;
+    \item \textbf{Axios} : client HTTP typé.
+\end{itemize}
+
+\section{Pages de l'application}
+
+\subsection{Page Predict — Tableau de bord unifié}
+
+La page principale combine la prédiction et l'impact en un seul tableau de bord. Un seul clic sur \textbf{Analyser} déclenche deux appels API en parallèle (\texttt{/predict} et \texttt{/impact}). La page affiche successivement :
+
+\begin{enumerate}
+    \item \textbf{Verdict de sécheresse} avec barre de confiance (rouge/vert) ;
+    \item \textbf{Perte économique totale} estimée en MAD (ou "No Impact" si SPI $> S_0$) ;
+    \item \textbf{4 métriques climatiques} : précipitation, température, bilan hydrique, SPI ;
+    \item \textbf{Graphique des 6 derniers mois} de précipitations (AreaChart) ;
+    \item \textbf{Cartes de vulnérabilité} par culture avec jauges circulaires animées ;
+    \item \textbf{Contexte régional} : cultures principales, \% de terres pluviales ;
+    \item \textbf{Radar de vulnérabilité} par culture (RadarChart) ;
+    \item \textbf{Comparaison historique} avec la sécheresse la plus proche (BarChart).
+\end{enumerate}
+
+\subsection{Page Map — Carte interactive}
+
+Carte Leaflet centrée sur le Maroc affichant les 44 villes avec des cercles colorés selon la catégorie SPI du mois/année sélectionné. Un clic sur une ville ouvre un popup avec le statut, le SPI et un lien vers la prédiction complète.
+
+\subsection{Page History — Historique SPI}
+
+Graphique en aire (AreaChart) de la série temporelle mensuelle du SPI pour la ville sélectionnée, de 2000 à 2025. Les épisodes de sécheresse (SPI $< -1{,}0$) sont mis en évidence en rouge.
+
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter{Sources de Données}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{p{3.5cm}p{5cm}p{5cm}}
+        \toprule
+        \textbf{Jeu de données} & \textbf{Source} & \textbf{Couverture} \\
+        \midrule
+        Données climatiques & Open-Meteo Historical API & 44 villes, 2000--2025, mensuel \\
+        Coordonnées des villes & World Cities Dataset (filtré) & 44 villes marocaines \\
+        Production agricole & FAOSTAT — Maroc (code 137) & 2000--2025, 4 cultures \\
+        Prix des cultures & ONICL & Prix de référence 2024--2025 \\
+        Coefficients SPI-rendement & CGIAR/ICARDA & Études empiriques Maroc ($R^2 \approx 0{,}3$--$0{,}6$) \\
+        Cartographie régionale & HCP Maroc & Part céréalière \%, irrigué \% \\
+        \bottomrule
+    \end{tabular}
+    \caption{Sources des données utilisées dans le projet}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+Ce projet a permis de concevoir un système complet de détection et de quantification de la sécheresse au Maroc, en combinant des approches de climatologie, de machine learning et d'économie agricole.
+
+\textbf{Sur le plan technique}, le projet illustre comment articuler :
+\begin{itemize}
+    \item une pipeline de données reproducible (collecte API → feature engineering → labellisation) ;
+    \item un classifieur Random Forest robuste aux déséquilibres de classes, avec sortie probabiliste ;
+    \item une API REST FastAPI documentée automatiquement et validée par Pydantic ;
+    \item une SPA React/TypeScript réactive et visuellement soignée.
+\end{itemize}
+
+\textbf{Sur le plan scientifique}, la connexion directe entre l'indice SPI prédit et les pertes agricoles en MAD constitue l'apport le plus original du projet. Elle répond à un besoin réel : transformer une information météorologique abstraite en \textit{signal décisionnel concret} pour les agriculteurs, les assureurs agricoles et les planificateurs de la sécurité alimentaire.
+
+\textbf{Perspectives d'amélioration} :
+\begin{enumerate}
+    \item Intégration de données satellitaires (NDVI, humidité des sols) pour enrichir les features ;
+    \item Extension du modèle d'impact aux secteurs de l'élevage et de l'arboriculture fruitière ;
+    \item Déploiement en ligne avec mise à jour automatique des données climatiques mensuelles ;
+    \item Ajout de scénarios climatiques futurs (CMIP6) pour prédictions à horizon 2030--2050.
+\end{enumerate}
+
+\vspace{1cm}
+\noindent Ce travail constitue une démonstration concrète de l'apport de l'intelligence artificielle et de la science des données à des enjeux environnementaux et socio-économiques critiques pour le Maroc.
+
+\end{document}

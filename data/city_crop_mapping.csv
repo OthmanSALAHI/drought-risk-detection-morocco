@@ -1,0 +1,45 @@
+city,region,primary_crops,cereal_share_pct,irrigated_pct
+Agadir,Souss-Massa,soft_wheat,2.0,45.0
+Al Hoceima,Tanger-Tétouan-Al Hoceima,soft_wheat;barley,16.0,20.0
+Beni Mellal,Béni Mellal-Khénifra,soft_wheat;olives,8.0,35.0
+Berkane,Oriental,soft_wheat;barley,5.0,25.0
+Biougra,Souss-Massa,soft_wheat;barley,2.0,40.0
+Boujdour,Laâyoune-Sakia El Hamra,barley,0.5,5.0
+Casablanca,Casablanca-Settat,soft_wheat,6.0,20.0
+Chefchaouen,Tanger-Tétouan-Al Hoceima,soft_wheat;olives,16.0,18.0
+Dakhla,Dakhla-Oued Ed-Dahab,barley,0.3,5.0
+El Jadida,Casablanca-Settat,soft_wheat;durum_wheat,6.0,22.0
+Errachidia,Drâa-Tafilalet,barley;durum_wheat,1.5,30.0
+Essaouira,Marrakech-Safi,soft_wheat;olives,12.0,15.0
+Fes,Fès-Meknès,soft_wheat;olives,37.0,28.0
+Figuig,Oriental,barley;durum_wheat,5.0,20.0
+Guelmim,Guelmim-Oued Noun,barley,1.0,10.0
+Ifrane,Fès-Meknès,soft_wheat;barley,37.0,25.0
+Kenitra,Rabat-Salé-Kénitra,soft_wheat;durum_wheat,28.0,30.0
+Khenifra,Béni Mellal-Khénifra,soft_wheat;barley,8.0,30.0
+Khouribga,Casablanca-Settat,soft_wheat,6.0,18.0
+Ksar El Kebir,Tanger-Tétouan-Al Hoceima,soft_wheat,16.0,22.0
+Laayoune,Laâyoune-Sakia El Hamra,barley,0.5,5.0
+Larache,Tanger-Tétouan-Al Hoceima,soft_wheat;barley,16.0,20.0
+Marrakech,Marrakech-Safi,soft_wheat;olives,12.0,20.0
+Meknes,Fès-Meknès,soft_wheat;olives,37.0,30.0
+Midelt,Drâa-Tafilalet,barley;durum_wheat,1.5,25.0
+Mohammedia,Casablanca-Settat,soft_wheat,6.0,20.0
+Nador,Oriental,soft_wheat;barley,5.0,22.0
+Ouarzazate,Drâa-Tafilalet,barley;olives,1.5,28.0
+Oued Zem,Béni Mellal-Khénifra,soft_wheat,8.0,25.0
+Oujda,Oriental,soft_wheat;barley,5.0,22.0
+Rabat,Rabat-Salé-Kénitra,soft_wheat,28.0,28.0
+Safi,Marrakech-Safi,soft_wheat;olives,12.0,18.0
+Salé,Rabat-Salé-Kénitra,soft_wheat,28.0,28.0
+Semara,Laâyoune-Sakia El Hamra,barley,0.5,5.0
+Settat,Casablanca-Settat,soft_wheat;durum_wheat,6.0,18.0
+Tan-Tan,Guelmim-Oued Noun,barley,1.0,8.0
+Tanger,Tanger-Tétouan-Al Hoceima,soft_wheat;barley,16.0,22.0
+Taroudant,Souss-Massa,soft_wheat;olives,2.0,42.0
+Tata,Drâa-Tafilalet,barley,1.5,15.0
+Taza,Fès-Meknès,soft_wheat;barley,37.0,22.0
+Tetouan,Tanger-Tétouan-Al Hoceima,soft_wheat;olives,16.0,20.0
+Tinghir,Drâa-Tafilalet,barley;durum_wheat,1.5,28.0
+Tiznit,Souss-Massa,soft_wheat;olives,2.0,35.0
+Zagora,Drâa-Tafilalet,barley;durum_wheat;olives,1.5,30.0

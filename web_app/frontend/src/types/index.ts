@@ -21,6 +21,51 @@ export interface PredictionResponse {
   no_drought_probability: number;
   climate_data: ClimateData;
   last_6_months: MonthData[];
+  economic_impact?: EconomicImpactSummary;
+}
+
+export interface EconomicImpactSummary {
+  total_loss_formatted: string;
+  top_risk_crop: string;
+  top_risk_vulnerability: string;
+}
+
+export interface CropRisk {
+  crop: string;
+  crop_label: string;
+  icon: string;
+  vulnerability: 'Very High' | 'High' | 'Moderate' | 'Low';
+  vulnerability_score: number;
+  estimated_yield_loss_pct: number;
+  estimated_production_loss_tonnes: number;
+  estimated_economic_loss_mad: number;
+}
+
+export interface RegionalContext {
+  region: string;
+  primary_crops: string;
+  rain_fed_pct: number;
+  cereal_share_pct: number;
+}
+
+export interface HistoricalComparison {
+  year: number;
+  spi: number;
+  prod_drop_pct: number;
+}
+
+export interface ImpactResponse {
+  city: string;
+  month: number;
+  year: number;
+  spi: number;
+  spi_category: string;
+  drought_severity: string;
+  crop_risks: CropRisk[];
+  total_estimated_loss_mad: number;
+  total_loss_formatted: string;
+  regional_context: RegionalContext;
+  historical_comparison: HistoricalComparison | null;
 }
 
 export interface MapCityData {

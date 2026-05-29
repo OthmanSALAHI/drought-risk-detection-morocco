@@ -4,6 +4,8 @@ import sys
 import math
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+
+from impact_engine import AgriculturalImpactEngine
 import logging
 
 from fastapi.responses import JSONResponse
@@ -55,6 +57,51 @@ class ClimateData(BaseModel):
     spi_category: str
 
 
+class EconomicImpactSummary(BaseModel):
+    total_loss_formatted: str
+    top_risk_crop: str
+    top_risk_vulnerability: str
+
+
+class CropRisk(BaseModel):
+    crop: str
+    crop_label: str
+    icon: str
+    vulnerability: str
+    vulnerability_score: float
+    estimated_yield_loss_pct: float
+    estimated_production_loss_tonnes: float
+    estimated_economic_loss_mad: float
+
+
+class RegionalContext(BaseModel):
+    region: str
+    primary_crops: str
+    rain_fed_pct: float
+    cereal_share_pct: float
+
+
+class HistoricalComparison(BaseModel):
+    year: int
+    spi: float
+    prod_drop_pct: float
+
+
+class ImpactResponse(BaseModel):
+    city: str
+    month: int
+    year: int
+    spi: float
+    spi_category: str
+    drought_severity: str
+    crop_risks: List[CropRisk]
+    total_estimated_loss_mad: float
+    total_loss_formatted: str
+    regional_context: RegionalContext
+    historical_comparison: Optional[HistoricalComparison] = None
+
+
+
 class MonthData(BaseModel):
     month: str
     precipitation: float
@@ -69,6 +116,7 @@ class PredictionResponse(BaseModel):
     no_drought_probability: float
     climate_data: ClimateData
     last_6_months: List[MonthData]
+    economic_impact: Optional[EconomicImpactSummary] = None
 
 
 class MapCityData(BaseModel):
@@ -375,6 +423,18 @@ except Exception as e:
     logger.error(f"✗ Failed to initialize model manager: {str(e)}")
     model_manager = None
 
+# Initialize agricultural impact engine
+try:
+    _data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
+    impact_engine = AgriculturalImpactEngine(
+        agriculture_csv=os.path.join(_data_dir, 'morocco_agriculture.csv'),
+        city_crop_csv=os.path.join(_data_dir, 'city_crop_mapping.csv'),
+    )
+    logger.info("✓ Agricultural impact engine initialized successfully")
+except Exception as e:
+    logger.error(f"✗ Failed to initialize impact engine: {str(e)}")
+    impact_engine = None
+
 
 # ============================================
 # Health Check Endpoint
@@ -494,6 +554,21 @@ async def predict(
         # Get last 6 months data
         last_6_months = model_manager.get_last_6_months_data(city, year, month)
 
+        # Build economic impact summary (only when drought predicted)
+        economic_impact = None
+        if prediction_label == "Drought" and impact_engine is not None:
+            try:
+                impact_data = impact_engine.compute_impact(city, spi, month, year)
+                if impact_data["crop_risks"]:
+                    top = impact_data["crop_risks"][0]
+                    economic_impact = EconomicImpactSummary(
+                        total_loss_formatted=impact_data["total_loss_formatted"],
+                        top_risk_crop=top["crop_label"],
+                        top_risk_vulnerability=top["vulnerability"],
+                    )
+            except Exception as ie:
+                logger.warning(f"Economic impact summary failed: {ie}")
+
         return PredictionResponse(
             city=city,
             month=month,
@@ -502,7 +577,8 @@ async def predict(
             drought_probability=round(drought_prob, 1),
             no_drought_probability=round(no_drought_prob, 1),
             climate_data=climate_data,
-            last_6_months=last_6_months
+            last_6_months=last_6_months,
+            economic_impact=economic_impact,
         )
 
     except HTTPException:
@@ -516,7 +592,84 @@ async def predict(
 
 
 # ============================================
-# Map Data Endpoint (placeholder)
+# Agricultural Impact Endpoint
+# ============================================
+
+@app.get("/impact", response_model=ImpactResponse)
+async def get_economic_impact(
+    city: str = Query(..., min_length=1),
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(..., ge=2000, le=2100),
+) -> ImpactResponse:
+    """
+    Get agricultural economic impact for a city/month/year based on SPI.
+    """
+    try:
+        if model_manager is None:
+            raise HTTPException(status_code=503, detail="Models not available")
+        if impact_engine is None:
+            raise HTTPException(status_code=503, detail="Impact engine not available")
+
+        available_cities = model_manager.get_available_cities()
+        if city.lower() not in [c.lower() for c in available_cities]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"City '{city}' not found. Available cities: {', '.join(available_cities)}"
+            )
+
+        if year < model_manager.min_year:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Earliest available year: {model_manager.min_year}"
+            )
+
+        city_data = model_manager.get_city_data_or_estimate(city, year, month)
+        if city_data is None or len(city_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No data available for {city} in month {month} of year {year}"
+            )
+
+        spi = float(city_data.iloc[0]["SPI"])
+        spi_category = classify_spi(spi)
+
+        payload = impact_engine.compute_impact(city, spi, month, year)
+
+        crop_risks = [CropRisk(**r) for r in payload["crop_risks"]]
+        regional = RegionalContext(**payload["regional_context"])
+        hist = payload.get("historical_comparison")
+        historical = (
+            HistoricalComparison(
+                year=hist["year"],
+                spi=hist["spi"],
+                prod_drop_pct=hist["prod_drop_pct"],
+            )
+            if hist else None
+        )
+
+        return ImpactResponse(
+            city=city,
+            month=month,
+            year=year,
+            spi=spi,
+            spi_category=spi_category,
+            drought_severity=payload["drought_severity"],
+            crop_risks=crop_risks,
+            total_estimated_loss_mad=payload["total_estimated_loss_mad"],
+            total_loss_formatted=payload["total_loss_formatted"],
+            regional_context=regional,
+            historical_comparison=historical,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in impact endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+# ============================================
+# Map Data Endpoint
 # ============================================
 
 @app.get("/map", response_model=MapResponse)
@@ -541,6 +694,7 @@ async def get_map_data(
                     f"{model_manager.max_date.strftime('%Y-%m')}"
                 )
             )
+
 
         available_cities = model_manager.get_available_cities()
         map_cities = []

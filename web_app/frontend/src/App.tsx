@@ -8,6 +8,7 @@ import { Predict } from './pages/Predict';
 import { MapView } from './pages/MapView';
 import { History } from './pages/History';
 import { About } from './pages/About';
+import { EconomicImpact } from './pages/EconomicImpact';
 
 const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <motion.div
@@ -33,6 +34,7 @@ export const App: React.FC = () => {
             <Route path="/predict" element={<PageWrapper><Predict /></PageWrapper>} />
             <Route path="/map" element={<PageWrapper><MapView /></PageWrapper>} />
             <Route path="/history" element={<PageWrapper><History /></PageWrapper>} />
+            <Route path="/impact" element={<PageWrapper><EconomicImpact /></PageWrapper>} />
             <Route path="/about" element={<PageWrapper><About /></PageWrapper>} />
           </Routes>
         </AnimatePresence>
