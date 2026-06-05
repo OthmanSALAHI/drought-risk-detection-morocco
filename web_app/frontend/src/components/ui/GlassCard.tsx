@@ -13,10 +13,14 @@ export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
-      className={`relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl ${className}`}
+      className={`relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl ${className}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-      <div className="relative z-10">{children}</div>
+      {/* gradient overlay — clipped independently so dropdowns can escape */}
+      <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
+      </div>
+      {/* children rendered without z-index isolation so inner dropdowns can stack freely */}
+      <div className="relative">{children}</div>
     </motion.div>
   );
 };

@@ -1,0 +1,56 @@
+{
+  "feature_columns": [
+    "city_encoded",
+    "precipitation_sum",
+    "temperature_2m_mean",
+    "et0_fao_evapotranspiration",
+    "water_balance",
+    "precip_lag1",
+    "precip_lag2",
+    "precip_lag3",
+    "temp_lag1",
+    "temp_lag2",
+    "temp_lag3",
+    "precip_rolling3",
+    "precip_rolling6",
+    "temp_rolling3",
+    "et0_rolling3",
+    "month",
+    "season_encoded"
+  ],
+  "excluded_leakage_features": [
+    "SPI"
+  ],
+  "decision_threshold": 0.4,
+  "validation_strategy": "temporal_holdout_last_20_percent",
+  "temporal_cutoff": "2020-05-01",
+  "train_rows": 10560,
+  "test_rows": 2596,
+  "train_drought_rate": 0.1373,
+  "test_drought_rate": 0.1864,
+  "train_metrics": {
+    "accuracy": 0.8394,
+    "balanced_accuracy": 0.902,
+    "precision_drought": 0.4605,
+    "recall_drought": 0.9883,
+    "f1_drought": 0.6282,
+    "roc_auc": 0.9757
+  },
+  "test_metrics": {
+    "accuracy": 0.7912,
+    "balanced_accuracy": 0.7522,
+    "precision_drought": 0.4601,
+    "recall_drought": 0.6901,
+    "f1_drought": 0.5521,
+    "roc_auc": 0.844
+  },
+  "model": {
+    "type": "RandomForestClassifier",
+    "n_estimators": 500,
+    "max_depth": 10,
+    "min_samples_leaf": 8,
+    "min_samples_split": 20,
+    "max_features": "sqrt",
+    "class_weight": "balanced_subsample"
+  }
+}

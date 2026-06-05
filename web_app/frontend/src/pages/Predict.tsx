@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, AlertTriangle, CloudRain, Thermometer,
@@ -134,6 +134,19 @@ export const Predict: React.FC = () => {
   const [year, setYear] = useState(new Date().getFullYear());
   const [citySearch, setCitySearch] = useState('');
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const cityDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target as Node)) {
+        setCityDropdownOpen(false);
+        setCitySearch('');
+      }
+    };
+    if (cityDropdownOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [cityDropdownOpen]);
 
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [impact, setImpact] = useState<ImpactResponse | null>(null);
@@ -222,12 +235,13 @@ export const Predict: React.FC = () => {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
+          className="relative z-50"
         >
           <GlassCard className="p-5 mb-6">
             <div className="flex flex-wrap gap-3 items-end">
 
               {/* City selector */}
-              <div className="flex-1 min-w-[180px] relative">
+              <div ref={cityDropdownRef} className="flex-1 min-w-[180px] relative">
                 <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
                   City
                 </label>
@@ -244,7 +258,7 @@ export const Predict: React.FC = () => {
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
-                      className="absolute z-30 w-full mt-1.5 bg-slate-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+                      className="absolute z-[200] w-full mt-1.5 bg-slate-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden"
                     >
                       <div className="p-2">
                         <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg mb-1.5">
