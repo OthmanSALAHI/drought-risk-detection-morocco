@@ -2,6 +2,7 @@ import pickle
 import os
 import sys
 import math
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -191,6 +192,8 @@ class ModelManager:
     def __init__(self):
         self.drought_model = None
         self.city_encoder = None
+        self.feature_columns = DEFAULT_FEATURE_COLUMNS.copy()
+        self.drought_probability_threshold = DEFAULT_DROUGHT_PROBABILITY_THRESHOLD
         self.features_df = None
         self.cities_df = None
         self.model_path = os.path.join(os.path.dirname(__file__), 'models')
@@ -207,6 +210,7 @@ class ModelManager:
         try:
             drought_model_path = os.path.join(self.model_path, 'drought_model.pkl')
             city_encoder_path = os.path.join(self.model_path, 'city_encoder.pkl')
+            metadata_path = os.path.join(self.model_path, 'model_metadata.json')
 
             if not os.path.exists(drought_model_path):
                 raise FileNotFoundError(f"Drought model not found at {drought_model_path}")
@@ -220,6 +224,20 @@ class ModelManager:
             with open(city_encoder_path, 'rb') as f:
                 self.city_encoder = pickle.load(f)
             logger.info("✓ City encoder loaded successfully")
+
+            if os.path.exists(metadata_path):
+                with open(metadata_path, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+
+                self.feature_columns = metadata.get('feature_columns', self.feature_columns)
+                self.drought_probability_threshold = float(
+                    metadata.get('decision_threshold', self.drought_probability_threshold)
+                )
+                logger.info(
+                    "✓ Model metadata loaded "
+                    f"({len(self.feature_columns)} features, "
+                    f"threshold={self.drought_probability_threshold:.2f})"
+                )
 
         except Exception as e:
             logger.error(f"✗ Error loading models: {str(e)}")
@@ -368,9 +386,11 @@ class ModelManager:
         return last_6_months
 
 
-FEATURE_COLUMNS = [
+DEFAULT_DROUGHT_PROBABILITY_THRESHOLD = 0.40
+
+DEFAULT_FEATURE_COLUMNS = [
     'city_encoded', 'precipitation_sum', 'temperature_2m_mean', 'et0_fao_evapotranspiration',
-    'water_balance', 'SPI', 'precip_lag1', 'precip_lag2', 'precip_lag3', 'temp_lag1', 'temp_lag2',
+    'water_balance', 'precip_lag1', 'precip_lag2', 'precip_lag3', 'temp_lag1', 'temp_lag2',
     'temp_lag3', 'precip_rolling3', 'precip_rolling6', 'temp_rolling3', 'et0_rolling3',
     'month', 'season_encoded'
 ]
@@ -393,7 +413,7 @@ def classify_spi(spi: float) -> str:
     return "Extremely Wet"
 
 
-def predict_drought_probability(model, X: np.ndarray) -> Tuple[str, float, float]:
+def predict_drought_probability(model, X: np.ndarray, threshold: float) -> Tuple[str, float, float]:
     """Return binary drought label and probabilities with class-order safety."""
     prediction_proba = model.predict_proba(X)[0]
     classes = list(model.classes_)
@@ -402,7 +422,7 @@ def predict_drought_probability(model, X: np.ndarray) -> Tuple[str, float, float
 
     drought_prob = float(prediction_proba[drought_idx]) * 100
     no_drought_prob = float(prediction_proba[no_drought_idx]) * 100
-    prediction_label = "Drought" if drought_prob >= 50 else "No Drought"
+    prediction_label = "Drought" if drought_prob >= threshold * 100 else "No Drought"
 
     return prediction_label, drought_prob, no_drought_prob
 
@@ -457,7 +477,9 @@ async def health_check():
             "max_month": int(model_manager.max_date.month),
             "min_date": model_manager.min_date.strftime("%Y-%m-%d"),
             "max_date": model_manager.max_date.strftime("%Y-%m-%d"),
-        }
+        },
+        "model_features": model_manager.feature_columns,
+        "decision_threshold": model_manager.drought_probability_threshold,
     }
 
 
@@ -510,7 +532,7 @@ async def predict(
             )
 
         # Extract features for prediction
-        features_cols = FEATURE_COLUMNS
+        features_cols = model_manager.feature_columns
 
         city_encoded = model_manager.encode_city(city)
         city_data = city_data.copy()
@@ -533,6 +555,7 @@ async def predict(
             prediction_label, drought_prob, no_drought_prob = predict_drought_probability(
                 model_manager.drought_model,
                 X,
+                model_manager.drought_probability_threshold,
             )
         except Exception as e:
             logger.warning(f"Model prediction failed, falling back to SPI rule: {str(e)}")
@@ -708,7 +731,7 @@ async def get_map_data(
                     continue
 
                 # Extract features
-                features_cols = FEATURE_COLUMNS
+                features_cols = model_manager.feature_columns
 
                 city_encoded = model_manager.encode_city(city)
                 city_data = city_data.copy()
@@ -723,6 +746,7 @@ async def get_map_data(
                     prediction_label, drought_prob, _ = predict_drought_probability(
                         model_manager.drought_model,
                         X,
+                        model_manager.drought_probability_threshold,
                     )
                 except Exception as e:
                     logger.warning(f"Model prediction failed for {city}, falling back to SPI rule: {str(e)}")
